@@ -2,7 +2,7 @@
 #include <typeindex>
 #include <unordered_map>
 #include <vector>
-#include <functional>
+#include <list>
 
 struct Event {
     virtual ~Event() {};
@@ -12,54 +12,53 @@ struct Event {
 class FunctionHandlerBase {
 private:
     // To be implemented by MemberFunctionHandler
-    virtual void call(const Event& event) = 0;
+    virtual void call(Event* event) = 0;
 
 public:
     // Call the member function
-    void exec(const Event& event) {
+    void exec(Event* event) {
         call(event);
     }
 };
 
-// Template class to handle the member function (callback) of a concrete System, for a concrete Event.
-// Note that MemberFunctionHandler does not have System as a template, since the constructor takes an std::function object,
-// which is already tied to a concrete System's method
+// Template class to handle the member function (callback) in a concrete System, for a concrete Event.
 // --------------- 1 MemberFunctionHandler per callback --------------- // 
-template<class TEventType>
+template<class TSystem, class TEventType>
 class MemberFunctionHandler : public FunctionHandlerBase {
 
 public:
-    // Generic member function object. Takes an Event as input, returns nothing. (Member function to be used as Event callback)
-    //  std::function signature:
-    //  std::function<return_type(input_param_types) functor_name
-    typedef std::function<void(const TEventType&)> MemberFunction;
+    // Generic member function pointer. Takes an Event as input, returns nothing. (Member function to be used as Event callback)
+    //  function pointer signature: 
+    //  return_type (*func_ptr_name)(input_argument_types)
+    typedef void (TSystem::*MemberFunction)(TEventType*);
 
     // Constructor
-    MemberFunctionHandler(MemberFunction memberFunc) 
-        : member_func{memberFunc} {};
+    MemberFunctionHandler(TSystem* systemInstance, MemberFunction memberFunc) 
+        : system_instance{systemInstance}, member_func{memberFunc} {};
 
 
-    // Calls the member function (callback) from the instance of the System
-    void call(const Event& event) override {
-        // call the member function, with the concrete Event type that this member function expects
-        member_func(static_cast<const TEventType&>(event));
+    // Calls the relevant member function (callback) from the instance of the System
+    void call(Event* event) override {
+        // dereference the function pointer to call the member function, with the concrete Event type that this member function expects
+        (system_instance->*member_func)(static_cast<TEventType*>(event));
     }
 
 private:
-    MemberFunction member_func; // member function of a concrete System object, to be used as an event callback  
+    TSystem* system_instance; // pointer to System instance
+    MemberFunction member_func; // pointer to System's member function to be used as event callback  
 };
 
 
 // ---------------------- EventBus ---------------------- // 
-// For each type of Event, we will keep a list of member func. handlers, to call the concrete callback functions in the System for that Event type
-typedef std::vector<FunctionHandlerBase*> FuncHandlerList;
+// For each type of Event, we will keep a list of handlers, to call the concrete callback functions in the System for that Event type
+typedef std::list<FunctionHandlerBase*> FuncHandlerList;
 
 class EventBus {
 
 public:
-    template<class TEventType>
-    void subscribe(std::function<void(const TEventType&)> memberFunc) {
-        // we take the member (callback) function (that is tied to a concrete System object) for this type of Event as input parameter
+    template<class TSystem, class TEventType>
+    void subscribe(TSystem* systemInstance, void(TSystem::*memberFunc)(TEventType*)) {
+        // we take the concrete System object, and it's associated member (callback) function for this type of Event as input parameters
         FuncHandlerList* func_handlers_per_event = subscriber_map[typeid(TEventType)];
 
         if(func_handlers_per_event == nullptr) {
@@ -69,13 +68,13 @@ public:
         }
 
         func_handlers_per_event->push_back(
-            new MemberFunctionHandler<TEventType>(memberFunc)
+            new MemberFunctionHandler<TSystem,TEventType>(systemInstance, memberFunc)
         );
     }
 
     // execute all callback functions that have subscribed to this type of concrete Event
     template<class TEventType>
-    void publish(const TEventType& event) {
+    void publish(TEventType* event) {
         FuncHandlerList* func_handlers_per_event = subscriber_map[typeid(TEventType)];
         
         if(func_handlers_per_event == nullptr) {
@@ -122,7 +121,7 @@ public:
             for(int j = i+1; j < entities.size(); j++) {
                 if(entities.at(i) == entities.at(j)) { // check collision between 2 entities
                     // Publish the collision event
-                    event_bus.publish(CollisionEvent(i, j));
+                    event_bus.publish(new CollisionEvent(i, j));
                 }
             }
         }
@@ -135,17 +134,12 @@ public:
 
     // We register this WarningSystem to CollisionEvent subscribers
     void Init() {
-        event_bus.subscribe<CollisionEvent>(std::bind(&WarningSystem::OnCollisionEvent, this, std::placeholders::_1));
-        ////  OR ////
-        // event_bus.subscribe<CollisionEvent>([this](const CollisionEvent& collEvent) {
-        //     OnCollisionEvent(collEvent);
-        // }
-        // );
+        event_bus.subscribe(this, &WarningSystem::OnCOllisionEvent);
     }
 
     // Member (callback) function for a concrete Event of type CollisionEvent
-    void OnCollisionEvent(const CollisionEvent& collision) {
-        std::cout << "Collision between element " << unsigned(collision.entity_1) << " and " << unsigned(collision.entity_2) << std::endl;
+    void OnCOllisionEvent(CollisionEvent* collision) {
+        std::cout << "Collision between element " << unsigned(collision->entity_1) << " and " << unsigned(collision->entity_2) << std::endl;
     }
 };
 
