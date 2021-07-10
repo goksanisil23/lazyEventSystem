@@ -18,7 +18,7 @@ g++ main_func_ptr.cpp EventSystem_FuncPtr.hpp -o event_func_ptr
 
 ## Usage
 - Create your event struct which inherits from the abstract Event class:
-```
+```c++
 struct CollisionEvent : public Event {
     CollisionEvent(uint8_t ent_1, uint8_t ent_2) 
         : entity_1{ent_1}, entity_2{ent_2} {}
@@ -29,12 +29,12 @@ struct CollisionEvent : public Event {
 ```
 
 - Initialize the global `EventBus` object, which is a medium where concrete events are matched with concrete callback functions. Therefore it's the main element enabling the communication between classes.
-```
+```c++
 EventBus event_bus;
 ```
 
 - Inside the class that is responsible of triggering the event, use the `publish` method of `EventBus`:
-```
+```c++
 class PhysicsSystem {
     ...
     void CollisionUpdate() {
@@ -50,7 +50,7 @@ class PhysicsSystem {
     a) create the callback function that will be called once the event is triggered
 
     b) subscribe to the concrete event with the callback function created above.
-```
+```c++
 class WarningSystem {
     ...
     void OnCollisionEvent(const CollisionEvent& collision) {...}
