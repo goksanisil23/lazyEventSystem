@@ -26,7 +26,8 @@ public:
             for(int j = i+1; j < entities.size(); j++) {
                 if(entities.at(i) == entities.at(j)) { // check collision between 2 entities
                     // Publish the collision event
-                    event_bus.publish(CollisionEvent(i, j));
+                    event_bus.publish<CollisionEvent>(CollisionEvent(i, j));
+                    // event_bus.publish(CollisionEvent(i, j)); // --> Also works without explicitly specializing the template since compiler resolves from the input arg.
                 }
             }
         }
